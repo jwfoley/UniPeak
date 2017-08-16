@@ -1,0 +1,62 @@
+UniPeak 1.0
+Joseph W. Foley
+15 September 2012
+
+
+INTRODUCTION
+
+UniPeak is a simple command-line tool that reads sequence tag alignments from multiple high-throughput sequencing experiments and outputs a list of regions enriched for hits relative to a uniform background model, as well as the number of hits from each experiment within each region. The output is a regions × experiments matrix where each element is a hit count, analagous to a probes × experiments matrix where each element is a hybridization value from a microarray probe. UniPeak is lightweight enough to run in minutes per sample on a modern desktop computer (2 GB memory recommended). UniPeak has been tested on 3SEQ, RNA-seq, and ChIP-seq data. The region-calling algorithm is based on QuEST, Quantitative Enrichment of Sequence Tags (A Valouev et al., Nature Methods 2008).
+
+UniPeak takes at most three steps:
+  1. Convert each file containing mapped reads (SAM, BAM, BED, Corona Lite, or Eland "multi" format) to a UniPeak tag frequency file, which is in wiggle format and can be loaded on the UCSC browser.
+  2. For non-directional data only: call enriched regions on each experiment individually and determine the "strand shift" due to reading opposite ends of library DNA fragments. Strand shift is applied to both strands, so the estimated shift should be roughly half the library fragment size (minus linkers).
+  3. Call a single set of enriched regions by pooling the data, then generate a table that reports the number of tags from each sample in each region.
+
+
+QUICK START
+
+The easiest way to use UniPeak is to run ./generate_script.pl, which interactively asks a series of questions to create a shell script that you can then run to perform your analysis. ./generate_script.pl allows you to set many of the parameters for your UniPeak run, but I can't anticipate everything you'll think of doing, so you may need to edit the shell script it produces if it doesn't have what you need.
+
+
+EXTRAS
+  - annotate_region_counts.pl : use a reference table (e.g. UCSC genes) to annotate called regions
+  - fasta2contigs.pl : make a contig size table from FASTA reference sequences
+  - functions.R : R functions for handling UniPeak output
+  - get_shifts.pl : grab the recommended shift values from a list of bin/strand_shift output files
+  - regions2bed.pl : convert a regions table to BED format for UCSC browser
+  - regions2bed15.pl : convert a regions table to BED15 "microarray" format for UCSC browser
+  - regions2pcl.pl : convert a regions table to PCL format for microarray software
+  - wig2bigwigs.pl : convert a tag frequency or density profile wiggle plots to bigWig files and output appropriate headers (requires UCSC's wigToBigWig tool, which is not part of UniPeak and for which I do not provide support; this script may not work in nonstandard environments)
+  - bin/tags_in_regions : given a list of already called regions, add counts from additional samples (does not re-call the regions, so use it only for samples that should not contribute to region calling)
+
+
+TIPS
+  - You can run give ./generate_script.pl a list of input files as command-line arguments.
+  - Filenames ending in .gz or .bz2 are read/written with the corresponding compression format. This reduces disk usage at the expense of speed.
+  - If you don't like the hardcoded defaults, edit them in misc/defaults.hpp (requires the source code) and recompile.
+  - If you just want to test a small portion of your data, use a contig file with only a few of the contigs. Just be sure to give the whole genome's size in the -m argument to bin/strand_shift and bin/regions so your background calculation is unaffected.
+
+
+Q & A
+
+How/why are tags filtered by posterior probability?
+  Some non-uniquely mapping tags can become uniquely mapping tags if there is a base-calling error when sequencing them. Filtering by the posterior probability that the tag actually came from the best alignment removes a lot of artifacts. This is only done when UniPeak is able to calculate posterior probability, either from the list of alignments and mismatch counts in Eland extended or Corona Lite formats (with a simple binomial error model assuming a substitution error rate of 0.01) or from the MAPQ field in SAM/BAM format.
+
+How/why are regions filtered by kurtosis?
+  Certain technical artifacts resemble tall "stacks" of reads at a small number of genomic positions. To remove these, a region is filtered out if the distribution of hits within it exceeds a kurtosis threshold.
+
+How/why are non-directional regions filtered by strand correlation?
+  Non-directional tags should show equal densities on both strands, after correcting for strand shift, so low correlations between the strands are assumed to be artifacts and filtered out.
+
+What happens to negative controls?
+  Negative controls do not count toward the density profile or background calculations, and therefore do not contribute to region calling, but their tags counts in called regions are still reported.
+
+Can I re-analyze a profile I've already generated?
+  No. Because the profiles are so large, it's faster to recompute them than to read them from a disk anyway.
+
+Do the binary executables support I/O redirection?
+  Yes. Just use "stdin" or "stdout" in place of the appropriate filename argument. Note that this is incompatible with built-in compression, so you will have to run your pipeline through an appropriate filter. All progress updates are sent to STDERR so you can still see them.
+
+Can I run UniPeak in multi-threaded mode?
+  No.
+
