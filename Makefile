@@ -25,6 +25,7 @@ default: all
 all: other_dependencies local_objects local_execs place
 
 place:
+	mkdir -p $(BIN_DIR)
 	mv $(LOCAL_TARGETS) $(BIN_DIR)
 
 local_execs: $(LOCAL_EXECS)
